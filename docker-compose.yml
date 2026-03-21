@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: keyloop
+      POSTGRES_PASSWORD: keyloop_pass
+      POSTGRES_DB: keyloop_scheduler
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keyloop -d keyloop_scheduler"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - scheduler_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: keyloop
+      DATABASE_PASSWORD: keyloop_pass
+      DATABASE_NAME: keyloop_scheduler
+      NODE_ENV: production
+      PORT: 3001
+      SEED_ON_STARTUP: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - scheduler_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    networks:
+      - scheduler_net
+
+volumes:
+  postgres_data:
+
+networks:
+  scheduler_net:
+    driver: bridge
